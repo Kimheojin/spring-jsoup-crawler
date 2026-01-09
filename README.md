@@ -37,13 +37,6 @@
 ## Configuration (`application.yml`)
 
 ```yaml
-# MongoDB 연결 설정 예시
-spring:
-  data:
-    mongodb:
-      uri: "mongodb://localhost:27017"
-      database: "recipe_db"
-
 # 크롤링 사이트 설정 예시
 recipe:
   sites:
