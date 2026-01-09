@@ -1,8 +1,8 @@
-## Spring Jsoup Recipe Crawler
+# Spring Jsoup Recipe Crawler
 
 - **Spring Boot**, **Jsoup** 기반 사이트 레시피 데이터 크롤러
 
-### 크롤링 대상 사이트 목록
+## 크롤링 대상 사이트 목록
 
 | 사이트        | Collection Name   | URL                         |
 | ------------- | ----------------- | --------------------------- |
@@ -12,7 +12,7 @@
 | 삼양          | samyang-data      | https://m.serveq.co.kr      |
 | 한식진흥원    | hansik-data       | https://www.hansik.or.kr    |
 
-### 주요 기능
+## 주요 기능
 
 - **CSS Selector 기반 파싱**
   - `Jsoup` 활용 DOM 기반 탐색 및 데이터 추출
@@ -29,12 +29,12 @@
   - **Indexing:** 목록 페이지에서 게시글 URL 수집
   - **수집:** 수집된 URL을 기반으로 상세 레시피 데이터 파싱 및 저장
 
-### 기술 스택
+## 기술 스택
 
 - Java 17, Spring Boot 3.5.3
 - MongoDB (Schemaless document store), Jsoup 1.21.1
 
-### Configuration (`application.yml`)
+## Configuration (`application.yml`)
 
 ```yaml
 # MongoDB 연결 설정 예시
@@ -55,11 +55,11 @@ recipe:
       css-selector: "a.stretched-link" # 사이트 인덱스 관련 
 ```
 
-### API Trigger & Usage
+## API Trigger & Usage
 
 - Spring Web 환경에서 구동되며, HTTP 요청을 통해 크롤링 작업을 제어
 
-#### 1. IDE 활용 시 (Recommended)
+### 1. IDE 활용 시 (Recommended)
 
 `trigger.http` 파일 트리거 활용.
 
@@ -71,13 +71,13 @@ POST http://localhost:8080/hansik/crawl
 POST http://localhost:8080/tenth/url
 ```
 
-#### 2. curl 명령어 활용
+### 2. curl 명령어 활용
 
 ```bash
 curl -X POST http://localhost:8080/hansik/crawl
 ```
 
-### Project Structure
+## Project Structure
 
 ```text
 src/main/java/HeoJin/crawling_spring
@@ -89,7 +89,7 @@ src/main/java/HeoJin/crawling_spring
 └── tenth           # [만개의레시피] Crawler Implementation
 ```
 
-### Data Schema 예시
+## Data Schema 예시
 
 ```json
 {
@@ -107,10 +107,10 @@ src/main/java/HeoJin/crawling_spring
 }
 ```
 
-### Database Configuration (`application-mongo.yaml`)
+## Database Configuration (`application-mongo.yaml`)
 
-`spring.profiles.active: mongo` 설정 시 활성화되는 MongoDB 연결 설정 예시입니다. 
-해당 설정은 `src/main/java/HeoJin/crawling_spring/common/config/mongo/MongoConfig.java`에서 참조됩니다.
+- `spring.profiles.active: mongo` 설정 시 활성화되는 MongoDB 연결 설정 예시 
+- 해당 설정은 `src/main/java/HeoJin/crawling_spring/common/config/mongo/MongoConfig.java`에서 참조
 
 ```yaml
 spring:
