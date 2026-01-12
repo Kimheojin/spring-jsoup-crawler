@@ -24,7 +24,7 @@
   - `application.yml`을 통해 Target URL, Collection Name, Selector 등을 중앙 제어
 - **기능 별 아키텍쳐 분리**
   - 사이트별 독립 패키지(`hansik`, `menupan` 등) 구성
-  - 개별 서비스(`Service Class`) 단위로 로직이 격리
+  - 개별 서비스(`Service Class`) 단위로 로직 격리
 - **공통 아키텍쳐 흐름**
   - **Indexing:** 목록 페이지에서 게시글 URL 수집
   - **수집:** 수집된 URL을 기반으로 상세 레시피 데이터 파싱 및 저장
@@ -32,7 +32,7 @@
 ## 기술 스택
 
 - Java 17, Spring Boot 3.5.3
-- MongoDB (Schemaless document store), Jsoup 1.21.1
+- MongoDB, Jsoup 1.21.1
 
 ## Configuration (`application.yml`)
 
@@ -45,41 +45,44 @@ recipe:
       collection-name: "hansik-data"
   indexUrl:
     hansik:
-      css-selector: "a.stretched-link" # 사이트 인덱스 관련 
+      url: "https://www.hansik.or.kr/board/re/list/..."
+      collection-name: "testHansik"
+      css-selector: "a.stretched-link" 
 ```
 
-## API Trigger & Usage
+## API Trigger
 
-- Spring Web 환경에서 구동되며, HTTP 요청을 통해 크롤링 작업을 제어
+- Spring Web 환경에서 구동, HTTP 요청을 통해 크롤링 작업을 제어
 
-### 1. IDE 활용 시 (Recommended)
+### 1. IDE 활용 시
 
 `trigger.http` 파일 트리거 활용.
 
 ```http
 ### [한식진흥원] 레시피 크롤링 요청
-POST http://localhost:8080/hansik/crawl
+POST http://localhost:8080/api/crawling/hansik/data
 
 ### [만개의레시피] URL 인덱스 수집 요청
-POST http://localhost:8080/tenth/url
+POST http://localhost:8080/api/crawling/tenthRecipes/urls?startPage=1&lastPage=265
 ```
 
 ### 2. curl 명령어 활용
 
 ```bash
-curl -X POST http://localhost:8080/hansik/crawl
+# 한식진흥원 데이터 크롤링
+curl -X POST http://localhost:8080/api/crawling/hansik/data
 ```
 
 ## Project Structure
 
 ```text
 src/main/java/HeoJin/crawling_spring
-├── common          # Shared Config, Entity, Exception, Utils
-├── hansik          # [한식진흥원] Crawler Implementation
-├── menupan         # [메뉴판닷컴] Crawler Implementation
-├── okitchen        # [오키친] Crawler Implementation
-├── samyang         # [삼양] Crawler Implementation
-└── tenth           # [만개의레시피] Crawler Implementation
+├── common          # Shared Config, Entity, Exception
+├── hansik          # [한식진흥원] 
+├── menupan         # [메뉴판닷컴] 
+├── okitchen        # [오키친] 
+├── samyang         # [삼양] 
+└── tenth           # [만개의레시피] 
 ```
 
 ## Data Schema 예시
@@ -100,15 +103,18 @@ src/main/java/HeoJin/crawling_spring
 }
 ```
 
-## Database Configuration (`application-mongo.yaml`)
+## Database Configuration (`application.yml`)
 
-- `spring.profiles.active: mongo` 설정 시 활성화되는 MongoDB 연결 설정 예시 
-- 해당 설정은 `src/main/java/HeoJin/crawling_spring/common/config/mongo/MongoConfig.java`에서 참조
+- `spring.profiles.active: mongo` 설정 시 활성화되는 MongoDB 연결 설정 
+- `src/main/resources/application.yml` 내 `mongo` 프로파일 영역 참조
 
 ```yaml
 spring:
+  config:
+    activate:
+      on-profile: mongo
   data:
     mongodb:
-      uri: "mongodb://<username>:<password>@<host>:<port>"
+      uri: "mongodb://<username>:<password>@<host>:<port>" # 실제 환경 변수 또는 설정 값 필요
       database: "recipe_db"
 ```
