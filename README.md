@@ -50,7 +50,7 @@ POST http://localhost:8080/api/crawling/tenthRecipes/urls?startPage=1&lastPage=2
 
 ### 설정 관리
 
-- `application.yml`을 통해 Target URL, Collection Name, Selector 등을 중앙 제어
+- `application.yml`을 통해 Target URL, CollectionName, Selector 등을 중앙 제어
 
 ```yaml
 # src/main/resources/application.yml
@@ -75,6 +75,7 @@ crawlingUtil.crawlWithPagination(baseUrl, cssSelector, ...);
 ```
 
 ### 기능 별 아키텍쳐 분리
+
 - 사이트별 독립 패키지 구성을 통해 도메인 로직 격리 및 확장성 확보
 
 ```text
@@ -132,7 +133,9 @@ public void crawlSingleRecipe(String recipeUrl) {
 ```
 
 ### Polite Crawling (Rate Limiting)
+
 - `Thread.sleep`을 이용한 요청 간격 조절로 대상 서버 부하 방지 및 차단 회피
+
 ```java
 for (Long i = startIndex; i <= lastIndex; i++) {
     try {
@@ -144,8 +147,9 @@ for (Long i = startIndex; i <= lastIndex; i++) {
 }
 ```
 
-### 데이터 정제 및 전처리 (Data Cleaning)
+### 데이터 정제 및 전처리
 - 정규표현식 및 문자열 파싱을 통한 로우 데이터 가공
+
 ```java
 // 숫자 외 문자 제거 및 정수 파싱
 String timeStr = timeElement.text().replaceAll("[^0-9]", "");
@@ -160,7 +164,9 @@ List<Ingredient> ingredients = content.select("div.ingredients p")
 ```
 
 ### 예외 처리 및 안정성 (Robustness)
+
 - `Optional` 및 개별 `try-catch` 설계를 통해 특정 요소 누락 시에도 전체 프로세스 유지
+
 ```java
 // Optional을 활용한 필수 요소 검증
 Element content = Optional.ofNullable(doc.select("div.content.detailBody").first())
