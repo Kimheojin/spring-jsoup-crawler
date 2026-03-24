@@ -4,13 +4,19 @@
 
 ## 크롤링 대상 사이트 목록
 
-| 사이트        | Collection Name   | URL                         |
-| ------------- | ----------------- | --------------------------- |
-| 오 키친       | okitchen-data     | https://www.okitchen.co.kr  |
-| 만개의 레시피 | recipe-10000-data | https://www.10000recipe.com |
-| 메뉴판닷컴    | menupan-data      | https://www.menupan.com     |
-| 삼양          | samyang-data      | https://m.serveq.co.kr      |
-| 한식진흥원    | hansik-data       | https://www.hansik.or.kr    |
+| 사이트        | Collection Name   | URL                         | 수집 방식             |
+| ------------- | ----------------- | --------------------------- | --------------------- |
+| 오 키친       | okitchen-data     | https://www.okitchen.co.kr  | 상세 URL 직접 파싱    |
+| 만개의 레시피 | recipe-10000-data | https://www.10000recipe.com | URL 인덱스 기반 수집  |
+| 메뉴판닷컴    | testMenuPan       | https://www.menupan.com     | 게시글 번호 루프 파싱 |
+| 삼양          | testSamYang       | https://m.serveq.co.kr      | 카테고리별 상세 추출  |
+| 한식진흥원    | testHansik        | https://www.hansik.or.kr    | 목록 페이지 순회 추출 |
+
+## 크롤링 프로세스 (Two-Step Strategy)
+
+- **Step 1: URL Indexing**: 대상 사이트의 목록 페이지를 순회하며 각 레시피의 상세 URL을 추출하여 MongoDB(`RecipeUrlIndex`)에 1차 저장
+- **Step 2: Data Parsing**: 저장된 URL 인덱스를 기반으로 상세 페이지에 접속하여 레시피 데이터(재료, 순서 등)를 추출 및 정제
+- **Step 3: Persistence**: 최종 가공된 데이터를 사이트별 전용 Collection에 저장하여 데이터 유실 방지 및 중복 체크 수행
 
 ## 주요 기능
 
@@ -35,6 +41,7 @@ Elements steps = content.select("div.ContentArea p");
 // 특정 텍스트를 포함하는 요소의 인접 요소 선택 (:contains 활용)
 Element time = content.select("span:contains(조리시간) + h4").first();
 ```
+
 ### `trigger.http` 활용
 
 - 외부 툴 없이 IDE 내부에서 API 테스트 및 크롤링 실행 가능
@@ -50,7 +57,7 @@ POST http://localhost:8080/api/crawling/tenthRecipes/urls?startPage=1&lastPage=2
 
 ### 설정 관리
 
-- `application.yml`을 통해 Target URL, CollectionName, Selector 등을 중앙 제어
+- `application.yml`을 통해 Target URL, CollectionName, Selector 등 중앙 제어
 
 ```yaml
 # src/main/resources/application.yml
@@ -58,7 +65,7 @@ recipe:
   indexUrl:
     hansik:
       url: "https://www.hansik.or.kr/board/re/list/..."
-      collection-name: "hansik-data"
+      collection-name: "testHansik"
       css-selector: "a.stretched-link"
 ```
 
@@ -93,45 +100,6 @@ src/main/java/.../crawling_spring
 └── ... (각 사이트별 동일 구조 적용)
 ```
 
-### 공통 아키텍쳐 흐름
-
-- 목록 페이지에서 게시글 URL 수집
-
-```java
-public void crawlRecipeUrls(int startPage, int endPage) {
-    for (int page = startPage; page <= endPage; page++) {
-        Document doc = Jsoup.connect(url + page).get();
-        Elements links = doc.select(cssSelector);
-        
-        for (Element link : links) {
-            String recipeUrl = link.attr("abs:href");
-            mongoTemplate.save(new RecipeUrlIndex(recipeUrl), collectionName);
-        }
-    }
-}
-```
-
-- 수집된 URL을 기반으로 상세 레시피 데이터 파싱 및 저장
-
-```java
-public void crawlSingleRecipe(String recipeUrl) {
-    Document doc = Jsoup.connect(recipeUrl).get();
-    
-    String name = doc.select("h2.title").text();
-    List<Ingredient> ingredients = parseIngredients(doc);
-    List<CookingOrder> steps = parseSteps(doc);
-
-    Recipe recipe = Recipe.builder()
-            .recipeName(name)
-            .ingredientList(ingredients)
-            .cookingOrderList(steps)
-            .sourceUrl(recipeUrl)
-            .build();
-            
-    mongoTemplate.save(recipe, collectionName);
-}
-```
-
 ### Polite Crawling (Rate Limiting)
 
 - `Thread.sleep`을 이용한 요청 간격 조절로 대상 서버 부하 방지 및 차단 회피
@@ -147,23 +115,28 @@ for (Long i = startIndex; i <= lastIndex; i++) {
 }
 ```
 
-### 데이터 정제 및 전처리
-- 정규표현식 및 문자열 파싱을 통한 로우 데이터 가공
+### 데이터 정합성 및 복구 (Recovery Mechanism)
+
+- 크롤링 중 누락되거나 실패한 데이터를 식별하여 재시도 수행
+- `siteIndex`와 `hrefIndex`를 비교하여 유실된 레시피 데이터 자동 복구
 
 ```java
-// 숫자 외 문자 제거 및 정수 파싱
-String timeStr = timeElement.text().replaceAll("[^0-9]", "");
-int minutes = Integer.parseInt(timeStr);
-
-// 쉼표 구분자 기반 재료 데이터 분리 및 정제
-List<Ingredient> ingredients = content.select("div.ingredients p")
-        .stream()
-        .flatMap(text -> Arrays.stream(text.split(",")))
-        .map(String::trim)
-        .collect(Collectors.toList());
+// TenthRecipeRecoveryService.java
+public void recoveryData() {
+    // 1. 수집된 데이터 인덱스 로드
+    HashSet<String> dataIndex = siteIndexList.stream()...
+    
+    // 2. 전체 URL 인덱스와 대조하여 미수집 항목 식별
+    for (Object object : hrefIndexList) {
+        if (!dataIndex.contains(hrefIndex)) {
+            // 3. 미수집 데이터에 대해 재수집 수행
+            tenthRecipeService.crawlSingleRecipe(sourceUrl, hrefIndex);
+        }
+    }
+}
 ```
 
-### 예외 처리 및 안정성 (Robustness)
+### 예외 처리 및 안정성
 
 - `Optional` 및 개별 `try-catch` 설계를 통해 특정 요소 누락 시에도 전체 프로세스 유지
 
