@@ -2,7 +2,7 @@
 
 - Spring Boot, Jsoup 기반 사이트 레시피 데이터 크롤러
 
-## 크롤링 대상 사이트 목록
+## 크롤링 구현 사이트 목록
 
 | 사이트        | Collection Name   | URL                         | 수집 방식             |
 | ------------- | ----------------- | --------------------------- | --------------------- |
@@ -12,11 +12,11 @@
 | 삼양          | testSamYang       | https://m.serveq.co.kr      | 카테고리별 상세 추출  |
 | 한식진흥원    | testHansik        | https://www.hansik.or.kr    | 목록 페이지 순회 추출 |
 
-## 크롤링 프로세스 (Two-Step Strategy)
+## 크롤링 프로세스 
 
-- **Step 1: URL Indexing**: 대상 사이트의 목록 페이지를 순회하며 각 레시피의 상세 URL을 추출하여 MongoDB(`RecipeUrlIndex`)에 1차 저장
-- **Step 2: Data Parsing**: 저장된 URL 인덱스를 기반으로 상세 페이지에 접속하여 레시피 데이터(재료, 순서 등)를 추출 및 정제
-- **Step 3: Persistence**: 최종 가공된 데이터를 사이트별 전용 Collection에 저장하여 데이터 유실 방지 및 중복 체크 수행
+- **1. URL Indexing**: 대상 사이트의 목록 페이지를 순회하며 각 레시피의 상세 URL을 추출하여 MongoDB(`RecipeUrlIndex`)에 1차 저장
+- **2. Data Parsing**: 저장된 URL 인덱스를 기반으로 상세 페이지에 접속하여 레시피 데이터(재료, 순서 등)를 추출 및 정제
+- **3. Persistence**: 최종 가공된 데이터를 사이트별 전용 Collection에 저장하여 데이터 유실 방지 및 중복 체크 수행
 
 ## 주요 기능
 
@@ -57,7 +57,7 @@ POST http://localhost:8080/api/crawling/tenthRecipes/urls?startPage=1&lastPage=2
 
 ### 설정 관리
 
-- `application.yml`을 통해 Target URL, CollectionName, Selector 등 중앙 제어
+- `application.yml` 기반 설정 관리: 타겟 URL, MongoDB 컬렉션명, CSS 셀렉터 등 중앙 제어
 
 ```yaml
 # src/main/resources/application.yml
@@ -81,26 +81,8 @@ private String cssSelector;
 crawlingUtil.crawlWithPagination(baseUrl, cssSelector, ...);
 ```
 
-### 기능 별 아키텍쳐 분리
 
-- 사이트별 독립 패키지 구성을 통해 도메인 로직 격리 및 확장성 확보
-
-```text
-src/main/java/.../crawling_spring
-├── hansik
-│   ├── controller
-│   ├── dto
-│   └── service
-├── menupan
-│   ├── controller
-│   └── service
-├── okitchen
-│   ├── controller
-│   └── service
-└── ... (각 사이트별 동일 구조 적용)
-```
-
-### Polite Crawling (Rate Limiting)
+### 크롤링 부하 방지 및 지연 처리
 
 - `Thread.sleep`을 이용한 요청 간격 조절로 대상 서버 부하 방지 및 차단 회피
 
@@ -115,7 +97,7 @@ for (Long i = startIndex; i <= lastIndex; i++) {
 }
 ```
 
-### 데이터 정합성 및 복구 (Recovery Mechanism)
+### 데이터 정합성 및 복구
 
 - 크롤링 중 누락되거나 실패한 데이터를 식별하여 재시도 수행
 - `siteIndex`와 `hrefIndex`를 비교하여 유실된 레시피 데이터 자동 복구
@@ -145,7 +127,7 @@ public void recoveryData() {
 Element content = Optional.ofNullable(doc.select("div.content.detailBody").first())
         .orElseThrow(() -> new CustomException("존재하지 않는 페이지"));
 
-// 부분적 데이터 누락에 대한 예외 처리 (Graceful Degradation)
+// 부분적 데이터 누락에 대한 예외 처리
 try {
     minutes = Integer.parseInt(timeElement.text().replaceAll("[^0-9]", ""));
 } catch (Exception e) {
@@ -175,5 +157,24 @@ try {
 
 ## 기술 스택
 
-- Java 17, Spring Boot 3.5.3
-- MongoDB, Jsoup 1.21.1
+- Java 17, Spring Boot 3.5.3, Spring Data MongoDB
+- MongoDB (NoSQL), Jsoup 1.21.1 (HTML Parsing Library)
+- Lombok, Gradle, Git, GitHub Actions (CI/CD)
+- JUnit 5, AssertJ (Unit & Integration Testing)
+
+## 프로젝트 구조
+
+```text
+src/
+├── main/
+│   ├── java/.../crawling_spring/
+│   │   ├── common/      # 공통 구성 (Config, Entity, Exception, Util)
+│   │   ├── hansik/      # 한식 레시피 관련 서비스
+│   │   ├── menupan/     # 메뉴판 레시피 관련 서비스
+│   │   ├── okitchen/    # 오키친 레시피 관련 서비스
+│   │   ├── samyang/     # 삼양 레시피 관련 서비스
+│   │   └── tenth/       # Tenth 레시피 관련 서비스 및 복구
+│   └── resources/
+│       └── application.yml # 설정 파일
+└── test/                # 단위 및 통합 테스트
+```
